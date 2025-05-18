@@ -1,0 +1,42 @@
+{
+  "name": "projet-final-back-benjaminmig3",
+  "version": "1.0.0",
+  "description": "App de messagerie instantanée",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test",
+    "start": "ts-node-dev src/index.ts"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.5.0",
+    "express": "^4.17.1",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.15.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/cors": "^2.8.18",
+    "@types/crypto-js": "^4.2.2",
+    "@types/express": "^4.17.13",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/mongoose": "^5.11.96",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^1.1.8",
+    "typescript": "^5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zkerkeb-class/projet-final-back-BenjaminMIG3.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zkerkeb-class/projet-final-back-BenjaminMIG3/issues"
+  },
+  "homepage": "https://github.com/zkerkeb-class/projet-final-back-BenjaminMIG3#readme"
+}
