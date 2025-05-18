@@ -1,14 +1,30 @@
 import Joi from "joi";
 
-const registerSchema = Joi.object({
+const registerUserSchema = Joi.object({
   username: Joi.string().min(3).max(30).required(),
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
 });
 
-const loginSchema = Joi.object({
+const registerMultipleUsersSchema = Joi.array().items(
+  Joi.object({
+    username: Joi.string().min(3).max(30).required(),
+    email: Joi.string().email().required(),
+    password: Joi.string().min(6).required(),
+  })
+).min(1).required();
+
+const loginUserSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
+});
+
+const deleteUserSchema = Joi.object({
+  userId: Joi.string().required(),
+});
+
+const getUserSchema = Joi.object({
+  userId: Joi.string().required(),
 });
 
 const messageSchema = Joi.object({
@@ -31,4 +47,4 @@ const updateMessageSchema = Joi.object({
   content: Joi.string().required(),
 });
 
-export { registerSchema, loginSchema, messageSchema, getMessagesSchema, sendMessageSchema, deleteMessageSchema, updateMessageSchema };
+export { registerUserSchema, registerMultipleUsersSchema, loginUserSchema, messageSchema, getMessagesSchema, sendMessageSchema, deleteMessageSchema, updateMessageSchema, deleteUserSchema, getUserSchema };

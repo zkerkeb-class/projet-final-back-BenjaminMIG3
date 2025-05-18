@@ -1,11 +1,10 @@
 import { Request, Response } from 'express';
-import Friendship from '../models/friendship';
+import Friendship from '../models/friendshipModel';
 import jwt from 'jsonwebtoken';
 
 class FriendshipController {
   async sendFriendRequest(req: Request, res: Response) {
-    const { receiverId } = req.body;
-    const senderId = (req as any).user.id; // Assuming user ID is stored in the request after authentication
+    const { senderId, receiverId } = req.body;// Assuming user ID is stored in the request after authentication
 
     try {
       const newFriendship = new Friendship({
@@ -20,17 +19,17 @@ class FriendshipController {
       res.status(500).json({ message: 'Error sending friend request', error });
     }
   }
+
   async acceptFriendRequest(req: Request, res: Response) {
-    const { friendshipId } = req.body;
-    const userId = (req as any).user.id; // Assuming user ID is stored in the request after authentication
+    const { receiverId, senderId } = req.body; // Assuming user ID is stored in the request after authentication
 
     try {
-      const friendship = await Friendship.findById(friendshipId);
+      const friendship = await Friendship.findOne({ user1: senderId, user2: receiverId });
       if (!friendship) {
         return res.status(404).json({ message: 'Friendship not found' });
       }
 
-      if (friendship.user2.toString() !== userId) {
+      if (friendship.user2.toString() !== receiverId) {
         return res.status(403).json({ message: 'You are not authorized to accept this friend request' });
       }
 

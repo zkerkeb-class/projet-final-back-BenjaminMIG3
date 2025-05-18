@@ -2,7 +2,7 @@ import express from 'express';
 import connectDB from './config/db';
 import mainRoutes from './routes/mainRoutes';
 import cors from 'cors';
-import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 import messageRouter from './routes/messageRoutes';
 import friendshipRouter from './routes/friendshipRoutes';
 
@@ -16,7 +16,7 @@ connectDB();
 app.use(express.json());
 app.use(cors());
 app.use('/', mainRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', userRoutes);
 app.use('/api/messages', messageRouter);
 app.use('/api/friends', friendshipRouter);
 
