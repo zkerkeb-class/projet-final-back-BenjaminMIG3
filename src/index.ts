@@ -18,7 +18,7 @@ app.use(cors());
 app.use('/', mainRoutes);
 app.use('/api/auth', userRoutes);
 app.use('/api/messages', messageRouter);
-app.use('/api/friends', friendshipRouter);
+app.use('/api/friendship', friendshipRouter);
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);

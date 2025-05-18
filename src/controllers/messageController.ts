@@ -9,8 +9,7 @@ class MessageController {
     if (error) {
       return res.status(400).json({ message: "Validation error", details: error.details });
     }
-    const { receiverId, content } = req.body;
-    const senderId = (req as any).user.id; // Assuming user ID is stored in the request after authentication
+    const { receiverId, senderId, content } = req.body;
     try {
       const newMessage = new Message({
         sender: Types.ObjectId.createFromHexString(senderId),
@@ -30,7 +29,7 @@ class MessageController {
     if (error) {
       return res.status(400).json({ message: "Validation error", details: error.details });
     }
-    const userId = (req as any).user.id;
+    const userId = req.params.userId;
     try {
       const messages = await Message.find({
         $or: [

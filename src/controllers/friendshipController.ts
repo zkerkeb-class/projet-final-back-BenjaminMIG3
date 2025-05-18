@@ -24,7 +24,7 @@ class FriendshipController {
     const { receiverId, senderId } = req.body; // Assuming user ID is stored in the request after authentication
 
     try {
-      const friendship = await Friendship.findOne({ user1: senderId, user2: receiverId });
+      const friendship = await Friendship.findOne({$or: [{sender: senderId, receiver: receiverId}, {sender: receiverId, receiver: senderId}]});
       if (!friendship) {
         return res.status(404).json({ message: 'Friendship not found' });
       }
@@ -41,27 +41,29 @@ class FriendshipController {
       res.status(500).json({ message: 'Error accepting friend request', error });
     }
   }
+
   async rejectFriendRequest(req: Request, res: Response) {
-    const { friendshipId } = req.body;
-    const userId = (req as any).user.id; // Assuming user ID is stored in the request after authentication
+    const { receiverId, senderId } = req.body;
+     // Assuming user ID is stored in the request after authentication
 
     try {
-      const friendship = await Friendship.findById(friendshipId);
+      const friendship = await Friendship.findOne({$or: [{sender: senderId, receiver: receiverId}, {sender: receiverId, receiver: senderId}]});
       if (!friendship) {
         return res.status(404).json({ message: 'Friendship not found' });
       }
 
-      if (friendship.user2.toString() !== userId) {
+      if (friendship.user2.toString() !== receiverId) {
         return res.status(403).json({ message: 'You are not authorized to reject this friend request' });
       }
 
-      await Friendship.deleteOne({ _id: friendshipId });
+      await Friendship.deleteOne({ _id: friendship._id });
 
       res.status(200).json({ message: 'Friend request rejected' });
     } catch (error) {
       res.status(500).json({ message: 'Error rejecting friend request', error });
     }
   }
+
   async getFriendRequests(req: Request, res: Response) {
     const userId = (req as any).user.id; // Assuming user ID is stored in the request after authentication
 
@@ -76,33 +78,24 @@ class FriendshipController {
       res.status(500).json({ message: 'Error fetching friend requests', error });
     }
   }
-  async getFriends(req: Request, res: Response) {
-    const { userId } = req.params; // Assuming user ID is stored in the request after authentication
+
+  async getFriendship(req: Request, res: Response) {
+    const { senderId, receiverId } = req.params; // Assuming user ID is stored in the request after authentication
 
     try {
-      const friends = await Friendship.find({
-        $or: [
-          { sender: userId, status: 'accepted' },
-          { receiver: userId, status: 'accepted' },
-        ],
-      }).populate('sender receiver', 'username email');
+      const friendship = await Friendship.findOne({$or: [{sender: senderId, receiver: receiverId}, {sender: receiverId, receiver: senderId}]});
 
-      res.status(200).json({ friends });
+      res.status(200).json({ friendship });
     } catch (error) {
-      res.status(500).json({ message: 'Error fetching friends', error });
+      res.status(500).json({ message: 'Error fetching friendship', error });
     }
   }
-  async removeFriend(req: Request, res: Response) {
-    const { friendId } = req.params; // Récupère depuis l'URL
-    const userId = (req as any).user.id; // ID de l'utilisateur authentifié
+
+  async removeFriendship(req: Request, res: Response) {
+    const { friendshipId } = req.params; // Récupère depuis l'URL
 
     try {
-      const friendship = await Friendship.findOne({
-        $or: [
-          { sender: userId, receiver: friendId },
-          { sender: friendId, receiver: userId },
-        ],
-      });
+      const friendship = await Friendship.findById(friendshipId);
 
       if (!friendship) {
         return res.status(404).json({ message: 'Friendship not found' });
@@ -115,6 +108,7 @@ class FriendshipController {
       res.status(500).json({ message: 'Error removing friend', error });
     }
   }
+
   async getFriendshipStatus(req: Request, res: Response) {
     const { userId } = req.params; // Assuming userId is passed as a URL parameter
     const currentUserId = (req as any).user.id; // Assuming user ID is stored in the request after authentication
