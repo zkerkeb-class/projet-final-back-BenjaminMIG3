@@ -41,10 +41,15 @@ class UserController {
       }
 
       const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || 'your_jwt_secret', { expiresIn: '1h' });
-      res.status(200).json({ token: token, userId: user._id });
+      res.status(200).json({ token: token, user: user });
     } catch (error) {
       res.status(500).json({ message: 'Error logging in', error });
     }
+  }
+
+  async logout(req: Request, res: Response) {
+    res.clearCookie('token');
+    res.status(200).json({ message: 'Logged out successfully' });
   }
 
   async deleteUser(req: Request, res: Response) {

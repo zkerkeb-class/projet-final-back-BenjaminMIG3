@@ -7,6 +7,7 @@ const userController = UserController;
 userRoutes.post('/register', userController.register);
 userRoutes.post('/register-multiple', userController.registerMultiple);
 userRoutes.post('/login', userController.login);
+userRoutes.get('/logout', userController.logout);
 userRoutes.delete('/delete/:userId', userController.deleteUser);
 userRoutes.get('/getUser/:userId', userController.getUser);
 
