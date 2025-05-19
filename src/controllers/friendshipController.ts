@@ -8,8 +8,8 @@ class FriendshipController {
 
     try {
       const newFriendship = new Friendship({
-        sender: senderId,
-        receiver: receiverId,
+        user1: senderId,
+        user2: receiverId,
         status: 'pending',
       });
 
@@ -24,7 +24,7 @@ class FriendshipController {
     const { receiverId, senderId } = req.body; // Assuming user ID is stored in the request after authentication
 
     try {
-      const friendship = await Friendship.findOne({$or: [{sender: senderId, receiver: receiverId}, {sender: receiverId, receiver: senderId}]});
+      const friendship = await Friendship.findOne({$or: [{user1: senderId, user2: receiverId}, {user1: receiverId, user2: senderId}]});
       if (!friendship) {
         return res.status(404).json({ message: 'Friendship not found' });
       }
@@ -47,7 +47,7 @@ class FriendshipController {
      // Assuming user ID is stored in the request after authentication
 
     try {
-      const friendship = await Friendship.findOne({$or: [{sender: senderId, receiver: receiverId}, {sender: receiverId, receiver: senderId}]});
+      const friendship = await Friendship.findOne({$or: [{user1: senderId, user2: receiverId}, {user1: receiverId, user2: senderId}]});
       if (!friendship) {
         return res.status(404).json({ message: 'Friendship not found' });
       }
@@ -65,16 +65,17 @@ class FriendshipController {
   }
 
   async getFriendRequests(req: Request, res: Response) {
-    const userId = (req as any).user.id; // Assuming user ID is stored in the request after authentication
-
+    const { userId } = req.params;
+    console.log(userId);
     try {
       const friendRequests = await Friendship.find({
-        receiver: userId,
+        user2: userId,
         status: 'pending',
-      }).populate('sender', 'username email');
-
+      }).populate('user1', 'username email');
+      console.log(friendRequests);
       res.status(200).json({ friendRequests });
     } catch (error) {
+      console.log(error);
       res.status(500).json({ message: 'Error fetching friend requests', error });
     }
   }
@@ -83,11 +84,23 @@ class FriendshipController {
     const { senderId, receiverId } = req.params; // Assuming user ID is stored in the request after authentication
 
     try {
-      const friendship = await Friendship.findOne({$or: [{sender: senderId, receiver: receiverId}, {sender: receiverId, receiver: senderId}]});
+      const friendship = await Friendship.findOne({$or: [{user1: senderId, user2: receiverId}, {user1: receiverId, user2: senderId}]});
 
       res.status(200).json({ friendship });
     } catch (error) {
       res.status(500).json({ message: 'Error fetching friendship', error });
+    }
+  }
+
+  async getFriends(req: Request, res: Response) {
+    const userId = req.params.userId; // Assuming user ID is stored in the request after authentication
+
+    try {
+      const friends = await Friendship.find({ $or: [{ user1: userId }, { user2: userId }] });
+
+      res.status(200).json({ friends });
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching friends', error });
     }
   }
 
@@ -116,8 +129,8 @@ class FriendshipController {
     try {
       const friendship = await Friendship.findOne({
         $or: [
-          { sender: currentUserId, receiver: userId },
-          { sender: userId, receiver: currentUserId },
+          { user1: currentUserId, user2: userId },
+          { user1: userId, user2: currentUserId },
         ],
       });
 

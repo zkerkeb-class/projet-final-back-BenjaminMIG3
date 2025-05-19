@@ -90,6 +90,15 @@ class UserController {
     res.status(200).json({ user });
   }
 
+  async getUserByEmail(req: Request, res: Response) {
+    const { email } = req.params;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({ user });
+  }
+
   async registerMultiple(req: Request, res: Response) {
     const { error } = registerMultipleUsersSchema.validate(req.body);
     if (error) {
@@ -128,6 +137,29 @@ class UserController {
       });
     } catch (error) {
       res.status(500).json({ message: 'Error registering users', error });
+    }
+  }
+
+  async getUserByUsername(req: Request, res: Response) {
+    const { username } = req.params;
+    try {
+      const users = await User.find({
+        username: { $regex: `^${username}`, $options: 'i' }
+      }).select('username email profilePicture');
+      
+      if (!users || users.length === 0) {
+        return res.status(404).json({ message: 'Aucun utilisateur trouvé' });
+      }
+      
+      res.status(200).json({ 
+        message: `${users.length} utilisateur(s) trouvé(s)`,
+        users 
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Erreur lors de la recherche des utilisateurs',
+        error 
+      });
     }
   }
 }

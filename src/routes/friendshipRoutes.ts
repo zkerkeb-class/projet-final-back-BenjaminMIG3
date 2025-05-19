@@ -10,7 +10,8 @@ friendshipRouter.post('/accept-request', authenticateToken, friendshipController
 friendshipRouter.post('/reject-request', authenticateToken, friendshipController.rejectFriendRequest);
 friendshipRouter.delete('/friendship/:friendshipId', authenticateToken, friendshipController.removeFriendship);
 friendshipRouter.get('/get-friendship/:senderId/:receiverId', authenticateToken, friendshipController.getFriendship);
-friendshipRouter.get('/get-friend-requests', authenticateToken, friendshipController.getFriendRequests);
+friendshipRouter.get('/get-friend-requests/:userId', authenticateToken, friendshipController.getFriendRequests);
 friendshipRouter.get('/get-friendship-status', authenticateToken, friendshipController.getFriendshipStatus);
+friendshipRouter.get('/get-friends/:userId', authenticateToken, friendshipController.getFriends);
 
 export default friendshipRouter;
