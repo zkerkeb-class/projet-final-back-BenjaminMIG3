@@ -1,124 +1,234 @@
 import { Request, Response } from 'express';
 import Friendship from '../models/friendshipModel';
-import jwt from 'jsonwebtoken';
+import User from '../models/userModel';
+import { Types } from 'mongoose';
 
 class FriendshipController {
+  
   async sendFriendRequest(req: Request, res: Response) {
-    const { senderId, receiverId } = req.body;// Assuming user ID is stored in the request after authentication
+    const { senderId, receiverId } = req.body;
 
     try {
+      // Vérifier si une friendship existe déjà
+      const senderObjectId = new Types.ObjectId(senderId);
+      const receiverObjectId = new Types.ObjectId(receiverId);
+
+      const existingFriendship = await Friendship.findOne({
+        $or: [
+          { sender: senderObjectId, receiver: receiverObjectId },
+          { sender: receiverObjectId, receiver: senderObjectId }
+        ]
+      });
+
+      if (existingFriendship) {
+        return res.status(400).json({ 
+          message: 'Une demande d\'amitié existe déjà entre ces utilisateurs',
+          friendship: existingFriendship
+        });
+      }
+
       const newFriendship = new Friendship({
-        user1: senderId,
-        user2: receiverId,
+        sender: senderObjectId,
+        receiver: receiverObjectId,
         status: 'pending',
       });
 
       await newFriendship.save();
-      res.status(201).json({ message: 'Friend request sent successfully', data: newFriendship });
+      res.status(201).json({ message: 'Demande d\'amitié envoyée avec succès', data: newFriendship });
     } catch (error) {
-      res.status(500).json({ message: 'Error sending friend request', error });
+      res.status(500).json({ message: 'Erreur lors de l\'envoi de la demande', error });
     }
   }
 
   async acceptFriendRequest(req: Request, res: Response) {
-    const { receiverId, senderId } = req.body; // Assuming user ID is stored in the request after authentication
-
+    const { receiverId, senderId } = req.body;
+    
     try {
-      const friendship = await Friendship.findOne({$or: [{user1: senderId, user2: receiverId}, {user1: receiverId, user2: senderId}]});
+      const friendship = await Friendship.findOne({
+        sender: senderId, 
+        receiver: receiverId,
+        status: 'pending'
+      });
+      
       if (!friendship) {
-        return res.status(404).json({ message: 'Friendship not found' });
+        console.log('Friendship not found or not pending');
+        return res.status(404).json({ message: 'Demande d\'amitié non trouvée ou déjà traitée' });
       }
 
-      if (friendship.user2.toString() !== receiverId) {
-        return res.status(403).json({ message: 'You are not authorized to accept this friend request' });
+      // Vérifier que l'utilisateur est bien le destinataire
+      if (friendship.receiver.toString() !== receiverId) {
+        return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à accepter cette demande' });
       }
 
       friendship.status = 'accepted';
       await friendship.save();
 
-      res.status(200).json({ message: 'Friend request accepted', data: friendship });
+      res.status(200).json({ message: 'Demande d\'amitié acceptée', data: friendship });
     } catch (error) {
-      res.status(500).json({ message: 'Error accepting friend request', error });
+      res.status(500).json({ message: 'Erreur lors de l\'acceptation de la demande', error });
     }
   }
 
   async rejectFriendRequest(req: Request, res: Response) {
     const { receiverId, senderId } = req.body;
-     // Assuming user ID is stored in the request after authentication
 
     try {
-      const friendship = await Friendship.findOne({$or: [{user1: senderId, user2: receiverId}, {user1: receiverId, user2: senderId}]});
+      const friendship = await Friendship.findOne({
+        sender: senderId, 
+        receiver: receiverId,
+        status: 'pending'
+      });
+      
       if (!friendship) {
-        return res.status(404).json({ message: 'Friendship not found' });
+        return res.status(404).json({ message: 'Demande d\'amitié non trouvée ou déjà traitée' });
       }
 
-      if (friendship.user2.toString() !== receiverId) {
-        return res.status(403).json({ message: 'You are not authorized to reject this friend request' });
+      // Vérifier que l'utilisateur est bien le destinataire
+      if (friendship.receiver.toString() !== receiverId) {
+        return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à rejeter cette demande' });
       }
 
       await Friendship.deleteOne({ _id: friendship._id });
 
-      res.status(200).json({ message: 'Friend request rejected' });
+      res.status(200).json({ message: 'Demande d\'amitié rejetée' });
     } catch (error) {
-      res.status(500).json({ message: 'Error rejecting friend request', error });
+      res.status(500).json({ message: 'Erreur lors du rejet de la demande', error });
     }
   }
 
   async getFriendRequests(req: Request, res: Response) {
     const { userId } = req.params;
-    console.log(userId);
     try {
+      if (!userId) {
+        return res.status(400).json({ message: 'userId est requis' });
+      }
+      
+      if (!Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ message: 'userId invalide' });
+      }
+
+      const userObjectId = new Types.ObjectId(userId);
       const friendRequests = await Friendship.find({
-        user2: userId,
+        receiver: userObjectId,
         status: 'pending',
-      }).populate('user1', 'username email');
-      console.log(friendRequests);
+      }).populate('sender', 'username email');
       res.status(200).json({ friendRequests });
     } catch (error) {
       console.log(error);
-      res.status(500).json({ message: 'Error fetching friend requests', error });
+      res.status(500).json({ message: 'Erreur lors de la récupération des demandes', error });
     }
   }
 
   async getFriendship(req: Request, res: Response) {
-    const { senderId, receiverId } = req.params; // Assuming user ID is stored in the request after authentication
-
+    const { senderId, receiverId } = req.params;
+    console.log("Receiver Name", await User.findById(receiverId).select('username'));
+    console.log("Sender Name", await User.findById(senderId).select('username'));
+    
     try {
-      const friendship = await Friendship.findOne({$or: [{user1: senderId, user2: receiverId}, {user1: receiverId, user2: senderId}]});
+      // Validation des paramètres
+      if (!senderId || !receiverId) {
+        return res.status(400).json({ message: 'senderId et receiverId sont requis' });
+      }
 
-      res.status(200).json({ friendship });
+      // Vérifier que les IDs sont valides avant de créer les ObjectId
+      if (!Types.ObjectId.isValid(senderId)) {
+        return res.status(400).json({ message: 'senderId invalide' });
+      }
+      if (!Types.ObjectId.isValid(receiverId)) {
+        return res.status(400).json({ message: 'receiverId invalide' });
+      }
+
+      // Conversion des chaînes en ObjectId pour la comparaison MongoDB
+      const senderObjectId = new Types.ObjectId(senderId);
+      const receiverObjectId = new Types.ObjectId(receiverId);
+
+      // Optimisation : recherche directe dans les deux sens possibles
+      const friendship = await Friendship.findOne({
+        $or: [
+          { sender: senderObjectId, receiver: receiverObjectId },
+          { sender: receiverObjectId, receiver: senderObjectId }
+        ]
+      }).populate('sender receiver', 'username email');
+
+      if (!friendship) {
+        return res.status(404).json({ message: 'Aucune relation d\'amitié trouvée entre ces utilisateurs' });
+      }
+
+      res.status(200).json({ 
+        friendship,
+        message: 'Relation d\'amitié récupérée avec succès'
+      });
     } catch (error) {
-      res.status(500).json({ message: 'Error fetching friendship', error });
+      console.error("Erreur dans getFriendship:", error);
+      res.status(500).json({ message: 'Erreur lors de la récupération de la relation', error });
     }
   }
 
   async getFriends(req: Request, res: Response) {
-    const userId = req.params.userId; // Assuming user ID is stored in the request after authentication
-
+    const userId = req.params.userId;
     try {
-      const friends = await Friendship.find({ $or: [{ user1: userId }, { user2: userId }] });
+      if (!userId) {
+        return res.status(400).json({ message: 'userId est requis' });
+      }
+      
+      if (!Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ message: 'userId invalide' });
+      }
 
-      res.status(200).json({ friends });
+      const userObjectId = new Types.ObjectId(userId);
+      // Récupérer toutes les amitiés où l'utilisateur est impliqué
+      const friendships = await Friendship.find({
+        $or: [{ sender: userObjectId }, { receiver: userObjectId }],
+        status: 'accepted'
+      });
+
+      // Extraire les IDs des amis (l'autre utilisateur dans chaque relation)
+      const friendIds = friendships.map(friendship => 
+        friendship.sender.toString() === userId ? friendship.receiver : friendship.sender
+      );
+
+      // Récupérer les informations des amis
+      const friendsData = await User.find(
+        { _id: { $in: friendIds } },
+        'username' // Sélectionner les champs souhaités
+      );
+
+      res.status(200).json({ friends: friendsData });
     } catch (error) {
-      res.status(500).json({ message: 'Error fetching friends', error });
+      console.error('Erreur lors de la récupération des amis:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des amis', error });
     }
   }
 
   async removeFriendship(req: Request, res: Response) {
     const { friendshipId } = req.params; // Récupère depuis l'URL
+    console.log('friendshipId', friendshipId);
 
     try {
-      const friendship = await Friendship.findById(friendshipId);
+      // Validation du friendshipId
+      if (!friendshipId) {
+        return res.status(400).json({ message: 'friendshipId est requis' });
+      }
+
+      // Vérifier que l'ID est valide avant de créer l'ObjectId
+      if (!Types.ObjectId.isValid(friendshipId)) {
+        return res.status(400).json({ message: 'friendshipId invalide' });
+      }
+
+      const friendshipObjectId = new Types.ObjectId(friendshipId);
+      const friendship = await Friendship.findById(friendshipObjectId);
 
       if (!friendship) {
-        return res.status(404).json({ message: 'Friendship not found' });
+        console.log('Friendship not found');
+        return res.status(404).json({ message: 'Relation d\'amitié non trouvée' });
       }
 
       await Friendship.deleteOne({ _id: friendship._id });
 
-      res.status(200).json({ message: 'Friend removed successfully' });
+      res.status(200).json({ message: 'Ami supprimé avec succès' });
     } catch (error) {
-      res.status(500).json({ message: 'Error removing friend', error });
+      console.error('Erreur lors de la suppression:', error);
+      res.status(500).json({ message: 'Erreur lors de la suppression', error });
     }
   }
 
@@ -127,10 +237,13 @@ class FriendshipController {
     const currentUserId = (req as any).user.id; // Assuming user ID is stored in the request after authentication
 
     try {
+      const userObjectId = new Types.ObjectId(userId);
+      const currentUserObjectId = new Types.ObjectId(currentUserId);
+
       const friendship = await Friendship.findOne({
         $or: [
-          { user1: currentUserId, user2: userId },
-          { user1: userId, user2: currentUserId },
+          { sender: currentUserObjectId, receiver: userObjectId },
+          { sender: userObjectId, receiver: currentUserObjectId },
         ],
       });
 
@@ -140,7 +253,7 @@ class FriendshipController {
 
       res.status(200).json({ status: friendship.status });
     } catch (error) {
-      res.status(500).json({ message: 'Error fetching friendship status', error });
+      res.status(500).json({ message: 'Erreur lors de la récupération du statut', error });
     }
   }
 }

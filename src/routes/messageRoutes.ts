@@ -3,10 +3,11 @@ import MessageController from "../controllers/messageController";
 import { authenticateToken } from "../middlewares/sessionMiddleware";
 
 const messageRouter = Router();
-const messageController = MessageController;
-messageRouter.post("/send", authenticateToken, messageController.sendMessage);
-messageRouter.get("/get", authenticateToken, messageController.getMessages);
-messageRouter.delete("/delete/:id", authenticateToken, messageController.deleteMessage);
-messageRouter.put("/update/:id", authenticateToken, messageController.updateMessage);
+
+messageRouter.post("/send", authenticateToken, MessageController.sendMessage);
+messageRouter.get("/conversation/:conversationId", authenticateToken, MessageController.getMessages);
+messageRouter.delete("/:id", authenticateToken, MessageController.deleteMessage);
+messageRouter.put("/:id", authenticateToken, MessageController.updateMessage);
+messageRouter.patch("/:id/read", authenticateToken, MessageController.markMessageAsRead);
 
 export default messageRouter;

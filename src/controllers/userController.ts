@@ -58,18 +58,18 @@ class UserController {
       return res.status(400).json({ message: 'Validation error', details: error.details });
     }
     const { userId } = req.params;
-    const messages = await Message.find({ sender: userId });
-    if (messages.length > 0) {
-      for (const message of messages) {
-        await Message.findByIdAndDelete(message._id);
-      }
-    }
-    const friendships = await Friendship.find({ user1: userId });
-    if (friendships.length > 0) {
-      for (const friendship of friendships) {
-        await Friendship.findByIdAndDelete(friendship._id);
-      }
-    }
+    
+    // Optimisation : supprimer tous les messages en une seule opération
+    await Message.deleteMany({ sender: userId });
+    
+    // Supprimer toutes les amitiés où l'utilisateur est soit sender soit receiver
+    await Friendship.deleteMany({ 
+      $or: [
+        { sender: userId },
+        { receiver: userId }
+      ]
+    });
+    
     const user = await User.findByIdAndDelete(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -142,20 +142,51 @@ class UserController {
 
   async getUserByUsername(req: Request, res: Response) {
     const { username } = req.params;
+    const idUser = (req as any).user.id; // Récupérer l'ID depuis le token JWT
+    
     try {
+      console.log("Recherche pour username:", username, "par l'utilisateur:", idUser);
+      
+      // Récupérer les amitiés acceptées de l'utilisateur
+      const friendships = await Friendship.find({
+        $or: [
+          { sender: idUser },
+          { receiver: idUser }
+        ],
+        status: 'accepted'
+      });
+
+      console.log("Friendships", friendships);
+
+      // Créer un ensemble des IDs des amis
+      const friendIds = new Set(
+        friendships.map(friendship => 
+          friendship.sender.toString() === idUser 
+            ? friendship.receiver.toString() 
+            : friendship.sender.toString()
+        )
+      );
+
+      // Ajouter l'ID de l'utilisateur lui-même à exclure
+      friendIds.add(idUser);
+
+      // Rechercher les utilisateurs qui correspondent au nom d'utilisateur
+      // et qui ne sont pas dans la liste des amis
       const users = await User.find({
-        username: { $regex: `^${username}`, $options: 'i' }
-      }).select('username email profilePicture');
+        username: { $regex: `^${username}`, $options: 'i' },
+        _id: { $nin: Array.from(friendIds) }
+      }).select('username email');
       
       if (!users || users.length === 0) {
         return res.status(404).json({ message: 'Aucun utilisateur trouvé' });
       }
-      
+
       res.status(200).json({ 
         message: `${users.length} utilisateur(s) trouvé(s)`,
-        users 
+        users
       });
     } catch (error) {
+      console.error("Erreur dans getUserByUsername:", error);
       res.status(500).json({ 
         message: 'Erreur lors de la recherche des utilisateurs',
         error 

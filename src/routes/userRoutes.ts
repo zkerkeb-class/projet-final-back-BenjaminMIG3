@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import UserController from '../controllers/userController';
+import { authenticateToken } from '../middlewares/sessionMiddleware';
 
 const userRoutes = Router();
 const userController = UserController;
@@ -11,5 +12,5 @@ userRoutes.get('/logout', userController.logout);
 userRoutes.delete('/delete/:userId', userController.deleteUser);
 userRoutes.get('/getUser/:userId', userController.getUser);
 userRoutes.get('/getUserByEmail/:email', userController.getUserByEmail);
-userRoutes.get('/getUserByUsername/:username', userController.getUserByUsername);
+userRoutes.get('/getUserByUsername/:username', authenticateToken, userController.getUserByUsername);
 export default userRoutes;
