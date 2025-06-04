@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "npm test",
-    "start": "ts-node-dev src/index.ts"
+    "start": "ts-node-dev src/index.ts",
+    "build": "tsc"
   },
   "dependencies": {
     "@types/socket.io": "^3.0.1",
