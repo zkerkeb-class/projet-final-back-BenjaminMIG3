@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Conversation from "../models/conversationModel";
 import Message from "../models/messageModel";
 import { Types } from "mongoose";
+import mongoose from "mongoose";
 
 class ConversationController {
   // Créer une nouvelle conversation
@@ -145,6 +146,67 @@ class ConversationController {
     } catch (error) {
       console.error(`[getConversation] Erreur lors de la récupération de la conversation ${conversationId}:`, error);
       res.status(500).json({ message: "Erreur lors de la récupération de la conversation", error });
+    }
+  }
+
+  async getMessageReadStats(req: Request, res: Response) {
+    const conversationId = req.params.conversationId;
+    const userId = (req as any).user.id;
+    console.log(`[getMessageReadStats] Récupération des stats de lecture pour la conversation: ${conversationId} par l'utilisateur: ${userId}`);
+    
+    try {
+      // Validation des IDs
+      if (!mongoose.isValidObjectId(conversationId)) {
+        console.log(`[getMessageReadStats] ID de conversation invalide: ${conversationId}`);
+        return res.status(400).json({ message: "ID de conversation invalide" });
+      }
+
+      if (!mongoose.isValidObjectId(userId)) {
+        console.log(`[getMessageReadStats] ID d'utilisateur invalide: ${userId}`);
+        return res.status(400).json({ message: "ID d'utilisateur invalide" });
+      }
+
+      // Vérifier si la conversation existe et si l'utilisateur en fait partie
+      const conversation = await Conversation.findById(conversationId)
+        .select('participants isGroup groupName'); // Sélectionner uniquement les champs nécessaires
+
+      if (!conversation) {
+        console.log(`[getMessageReadStats] Conversation non trouvée: ${conversationId}`);
+        return res.status(404).json({ message: "Conversation non trouvée" });
+      }
+
+      // Vérifier si l'utilisateur est participant de la conversation
+      const isParticipant = conversation.participants.some(
+        (participant) => participant.toString() === userId
+      );
+      if (!isParticipant) {
+        console.log(`[getMessageReadStats] Accès refusé - L'utilisateur ${userId} n'est pas participant de la conversation ${conversationId}`);
+        return res.status(403).json({ message: "Vous n'êtes pas participant de cette conversation" });
+      }
+
+      // Requête optimisée pour compter les messages non lus
+      const unreadMessagesCount = await Message.countDocuments({
+        conversation: conversationId,
+        sender: { $ne: userId },
+        'readBy.user': { $ne: userId }
+      });
+
+      console.log(`[getMessageReadStats] ${unreadMessagesCount} messages non lus trouvés pour la conversation ${conversationId}`);
+
+      res.status(200).json({
+        unreadCount: unreadMessagesCount,
+        conversationId: conversationId,
+        isGroup: conversation.isGroup,
+        groupName: conversation.groupName,
+        lastUpdate: new Date()
+      });
+
+    } catch (error) {
+      console.error(`[getMessageReadStats] Erreur lors de la récupération des stats pour ${conversationId}:`, error);
+      res.status(500).json({
+        message: "Erreur lors de la récupération des statistiques de lecture",
+        error: error instanceof Error ? error.message : "Erreur inconnue"
+      });
     }
   }
 

@@ -16,6 +16,8 @@ export interface IMessage extends Document {
   // Méthodes personnalisées
   markAsReadBy(userId: mongoose.Schema.Types.ObjectId): Promise<IMessage>;
   isReadBy(userId: mongoose.Schema.Types.ObjectId): boolean;
+  getReadStats(): { totalReaders: number; readers: Array<{ userId: mongoose.Schema.Types.ObjectId; readAt: Date }> };
+  getUnreadUsers(conversationId: mongoose.Schema.Types.ObjectId): Promise<Array<mongoose.Schema.Types.ObjectId>>;
 }
 
 const messageSchema = new mongoose.Schema<IMessage>({
@@ -89,27 +91,79 @@ messageSchema.post('save', async function() {
   );
 });
 
-// Méthode pour marquer un message comme lu par un utilisateur
+// Méthode pour marquer un message comme lu par un utilisateur (Optimisée)
 messageSchema.methods.markAsReadBy = function(userId: mongoose.Schema.Types.ObjectId) {
-  const existingRead = this.readBy.find((read: any) => 
-    read.user.toString() === userId.toString()
-  );
+  // Validation de l'entrée
+  if (!userId || !mongoose.isValidObjectId(userId)) {
+    throw new Error('ID utilisateur invalide');
+  }
+
+  const userIdString = userId.toString();
   
-  if (!existingRead) {
+  // Utilisation d'un Map pour une recherche O(1) au lieu de O(n)
+  const readByMap = new Map();
+  this.readBy.forEach((read: any) => {
+    readByMap.set(read.user.toString(), read);
+  });
+  
+  // Vérifier si l'utilisateur a déjà lu le message
+  if (!readByMap.has(userIdString)) {
     this.readBy.push({
       user: userId,
       readAt: new Date()
     });
+    
+    // Marquer le document comme modifié pour déclencher la sauvegarde
+    this.markModified('readBy');
   }
   
   return this.save();
 };
 
-// Méthode pour vérifier si un message a été lu par un utilisateur
+// Méthode pour vérifier si un message a été lu par un utilisateur (Optimisée)
 messageSchema.methods.isReadBy = function(userId: mongoose.Schema.Types.ObjectId): boolean {
-  return this.readBy.some((read: any) => 
-    read.user.toString() === userId.toString()
-  );
+  // Validation de l'entrée
+  if (!userId || !mongoose.isValidObjectId(userId)) {
+    return false;
+  }
+
+  const userIdString = userId.toString();
+  
+  // Utilisation d'un Map pour une recherche O(1) au lieu de O(n)
+  const readByMap = new Map();
+  this.readBy.forEach((read: any) => {
+    readByMap.set(read.user.toString(), true);
+  });
+  
+  return readByMap.has(userIdString);
+};
+
+// Méthode utilitaire pour obtenir les statistiques de lecture
+messageSchema.methods.getReadStats = function() {
+  return {
+    totalReaders: this.readBy.length,
+    readers: this.readBy.map((read: any) => ({
+      userId: read.user,
+      readAt: read.readAt
+    }))
+  };
+};
+
+// Méthode pour obtenir les utilisateurs qui n'ont pas encore lu le message
+messageSchema.methods.getUnreadUsers = async function(conversationId: mongoose.Schema.Types.ObjectId) {
+  const Conversation = mongoose.model('Conversation');
+  const conversation = await Conversation.findById(conversationId).populate('participants');
+  
+  if (!conversation) {
+    throw new Error('Conversation non trouvée');
+  }
+
+  const readUserIds = new Set(this.readBy.map((read: any) => read.user.toString()));
+  
+  return conversation.participants.filter((participant: any) => 
+    !readUserIds.has(participant._id.toString()) && 
+    participant._id.toString() !== this.sender.toString() // Exclure l'expéditeur
+  ).map((participant: any) => participant._id);
 };
 
 const Message: Model<IMessage> = mongoose.model<IMessage>('Message', messageSchema);

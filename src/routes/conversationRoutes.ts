@@ -7,6 +7,7 @@ const conversationRouter = Router();
 conversationRouter.post("/", authenticateToken, ConversationController.createConversation);
 conversationRouter.get("/user/:userId", authenticateToken, ConversationController.getUserConversations);
 conversationRouter.get("/:conversationId", authenticateToken, ConversationController.getConversation);
+conversationRouter.get("/:conversationId/read-stats", authenticateToken, ConversationController.getMessageReadStats);
 conversationRouter.delete("/:conversationId", authenticateToken, ConversationController.deleteConversation);
 
 export default conversationRouter; 

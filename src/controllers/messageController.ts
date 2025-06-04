@@ -10,6 +10,17 @@ class MessageController {
     console.log(`[sendMessage] Tentative d'envoi - Conversation: ${conversationId}, Sender: ${senderId}, Contenu: ${content.substring(0, 30)}...`);
     
     try {
+      // Validation des paramètres
+      if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+        console.log(`[sendMessage] ID de conversation invalide: ${conversationId}`);
+        return res.status(400).json({ message: "ID de conversation invalide" });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(senderId)) {
+        console.log(`[sendMessage] ID d'expéditeur invalide: ${senderId}`);
+        return res.status(400).json({ message: "ID d'expéditeur invalide" });
+      }
+
       // Vérifier si la conversation existe
       const conversation = await Conversation.findById(conversationId);
       if (!conversation) {
@@ -18,12 +29,21 @@ class MessageController {
       }
       console.log(`[sendMessage] Conversation trouvée: ${conversationId}, Participants: ${conversation.participants.length}`);
 
-      const senderObjectId = new mongoose.Schema.Types.ObjectId(senderId);
-      // Vérifier si l'expéditeur fait partie de la conversation
-      if (!conversation.participants.includes(senderObjectId)) {
+      // Créer l'ObjectId correctement
+      const senderObjectId = new mongoose.Types.ObjectId(senderId);
+      
+      // Vérifier si l'expéditeur fait partie de la conversation en comparant les strings
+      const isParticipant = conversation.participants.some(participant => 
+        participant.toString() === senderId
+      );
+      
+      if (!isParticipant) {
         console.log(`[sendMessage] Accès refusé - Sender ${senderId} n'est pas participant de la conversation ${conversationId}`);
+        console.log(`[sendMessage] Participants de la conversation:`, conversation.participants.map(p => p.toString()));
         return res.status(403).json({ message: "Vous n'êtes pas participant de cette conversation" });
       }
+
+      console.log(`[sendMessage] Vérification réussie - Sender ${senderId} est bien participant de la conversation`);
 
       const newMessage = new Message({
         conversation: conversationId,
@@ -45,6 +65,12 @@ class MessageController {
     console.log(`[getMessages] Récupération des messages pour la conversation: ${conversationId}`);
     
     try {
+      // Validation de l'ID de conversation
+      if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+        console.log(`[getMessages] ID de conversation invalide: ${conversationId}`);
+        return res.status(400).json({ message: "ID de conversation invalide" });
+      }
+
       const messages = await Message.find({ conversation: conversationId })
         .populate("sender", "username email")
         .sort({ timestamp: 1 });
@@ -63,6 +89,17 @@ class MessageController {
     console.log(`[deleteMessage] Tentative de suppression du message ${messageId} par l'utilisateur ${userId}`);
     
     try {
+      // Validation des IDs
+      if (!mongoose.Types.ObjectId.isValid(messageId)) {
+        console.log(`[deleteMessage] ID de message invalide: ${messageId}`);
+        return res.status(400).json({ message: "ID de message invalide" });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.log(`[deleteMessage] ID d'utilisateur invalide: ${userId}`);
+        return res.status(400).json({ message: "ID d'utilisateur invalide" });
+      }
+
       const message = await Message.findById(messageId);
       if (!message) {
         console.log(`[deleteMessage] Message non trouvé: ${messageId}`);
@@ -90,6 +127,17 @@ class MessageController {
     console.log(`[updateMessage] Tentative de modification du message ${messageId} par l'utilisateur ${userId}`);
     
     try {
+      // Validation des IDs
+      if (!mongoose.Types.ObjectId.isValid(messageId)) {
+        console.log(`[updateMessage] ID de message invalide: ${messageId}`);
+        return res.status(400).json({ message: "ID de message invalide" });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        console.log(`[updateMessage] ID d'utilisateur invalide: ${userId}`);
+        return res.status(400).json({ message: "ID d'utilisateur invalide" });
+      }
+
       const message = await Message.findById(messageId);
       if (!message) {
         console.log(`[updateMessage] Message non trouvé: ${messageId}`);
@@ -124,6 +172,17 @@ class MessageController {
     console.log(`[markMessageAsRead] Tentative de marquage comme lu du message ${messageId} par l'utilisateur ${userId}`);
     
     try {
+      // Validation des IDs
+      if (!mongoose.isValidObjectId(messageId)) {
+        console.log(`[markMessageAsRead] ID de message invalide: ${messageId}`);
+        return res.status(400).json({ message: "ID de message invalide" });
+      }
+
+      if (!mongoose.isValidObjectId(userId)) {
+        console.log(`[markMessageAsRead] ID d'utilisateur invalide: ${userId}`);
+        return res.status(400).json({ message: "ID d'utilisateur invalide" });
+      }
+
       const message = await Message.findById(messageId);
 
       if (!message) {
@@ -131,20 +190,70 @@ class MessageController {
         return res.status(404).json({ message: "Message non trouvé" });
       }
 
-      // Vérifier si le message est déjà lu par l'utilisateur
-      const wasAlreadyRead = message.isReadBy(userId);
+      // Créer l'ObjectId avec le bon type
+      const userObjectId = new mongoose.Types.ObjectId(userId);
+
+      // Vérifier si le message est déjà lu par l'utilisateur (méthode optimisée)
+      const wasAlreadyRead = message.isReadBy(userObjectId as any);
       if (wasAlreadyRead) {
         console.log(`[markMessageAsRead] Message ${messageId} déjà lu par l'utilisateur ${userId}`);
+        return res.status(200).json({ 
+          message: "Message déjà marqué comme lu", 
+          data: message,
+          alreadyRead: true 
+        });
       }
 
-      // Utiliser la méthode du modèle pour marquer comme lu
-      await message.markAsReadBy(userId);
+      // Utiliser la méthode optimisée du modèle pour marquer comme lu
+      await message.markAsReadBy(userObjectId as any);
       console.log(`[markMessageAsRead] Message ${messageId} marqué comme lu avec succès par l'utilisateur ${userId}`);
 
-      res.status(200).json({ message: "Message marqué comme lu", data: message });
+      res.status(200).json({ 
+        message: "Message marqué comme lu", 
+        data: message, 
+        alreadyRead: false 
+      });
     } catch (error) {
       console.error(`[markMessageAsRead] Erreur lors du marquage du message ${messageId}:`, error);
-      res.status(500).json({ message: "Erreur lors du marquage du message", error });
+      res.status(500).json({ message: "Erreur lors du marquage du message", error: error instanceof Error ? error.message : error });
+    }
+  }
+
+  async getMessageReadStats(req: Request, res: Response) {
+    const messageId = req.params.id;
+    console.log(`[getMessageReadStats] Récupération des statistiques de lecture pour le message ${messageId}`);
+    
+    try {
+      // Validation de l'ID
+      if (!mongoose.isValidObjectId(messageId)) {
+        console.log(`[getMessageReadStats] ID de message invalide: ${messageId}`);
+        return res.status(400).json({ message: "ID de message invalide" });
+      }
+
+      const message = await Message.findById(messageId)
+        .populate('readBy.user', 'username email')
+        .populate('sender', 'username email');
+
+      if (!message) {
+        console.log(`[getMessageReadStats] Message non trouvé: ${messageId}`);
+        return res.status(404).json({ message: "Message non trouvé" });
+      }
+
+      // Utiliser la nouvelle méthode pour obtenir les statistiques
+      const readStats = message.getReadStats();
+      
+      console.log(`[getMessageReadStats] Statistiques récupérées pour le message ${messageId}: ${readStats.totalReaders} lecteurs`);
+      
+      res.status(200).json({ 
+        messageId: messageId,
+        content: message.content.substring(0, 50) + '...',
+        sender: message.sender,
+        timestamp: message.timestamp,
+        readStats: readStats
+      });
+    } catch (error) {
+      console.error(`[getMessageReadStats] Erreur lors de la récupération des statistiques pour ${messageId}:`, error);
+      res.status(500).json({ message: "Erreur lors de la récupération des statistiques", error: error instanceof Error ? error.message : error });
     }
   }
 }
