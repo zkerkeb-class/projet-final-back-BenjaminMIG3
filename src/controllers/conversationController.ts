@@ -8,18 +8,14 @@ class ConversationController {
   // Créer une nouvelle conversation
   async createConversation(req: Request, res: Response) {
     const { participants, createdBy, isGroup, groupName } = req.body; // Extraire tous les champs nécessaires
-    console.log("Tentative de création de conversation avec les participants:", participants);
-    console.log("Données complètes reçues:", req.body); // Log pour déboguer
     
     try {
       // Vérifier si une conversation existe déjà entre ces participants
-      console.log("Recherche d'une conversation existante...");
       const existingConversation = await Conversation.findOne({
         participants: { $all: participants }
       });
   
       if (existingConversation) {
-        console.log("Conversation existante trouvée avec l'ID:", existingConversation._id);
         return res.status(200).json({ 
           message: "Conversation existante trouvée", 
           conversation: existingConversation 
@@ -27,22 +23,18 @@ class ConversationController {
       }
   
       if(participants.length < 2) {
-        console.log("Échec: Nombre insuffisant de participants (", participants.length, ")");
         return res.status(400).json({ message: "Une conversation doit avoir au moins 2 participants" });
       }
   
       if(participants.length > 50) {
-        console.log("Échec: Trop de participants (", participants.length, ")");
         return res.status(400).json({ message: "Une conversation ne peut pas avoir plus de 50 participants" });
       }
   
       // Validation du champ createdBy
       if (!createdBy) {
-        console.log("Échec: createdBy manquant");
         return res.status(400).json({ message: "Le champ createdBy est requis" });
       }
   
-      console.log("Création d'une nouvelle conversation...");
       const conversationData: any = {
         participants: participants.map((id: string) => Types.ObjectId.createFromHexString(id)),
         createdBy: Types.ObjectId.createFromHexString(createdBy),
@@ -58,7 +50,6 @@ class ConversationController {
       const newConversation = new Conversation(conversationData);
   
       await newConversation.save();
-      console.log("Nouvelle conversation créée avec succès, ID:", newConversation._id);
       res.status(201).json({ 
         message: "Conversation créée avec succès", 
         conversation: newConversation 
@@ -69,19 +60,59 @@ class ConversationController {
     }
   }
 
+  async addParticipantToConversation(req: Request, res: Response) {
+    const { conversationId, participantId } = req.body;
+    try {
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation non trouvée" });
+      }
+
+      if (conversation.participants.includes(participantId)) {
+        return res.status(400).json({ message: "Le participant est déjà dans la conversation" });
+      }
+
+      conversation.participants.push(participantId);
+      await conversation.save();
+      res.status(200).json({ message: "Participant ajouté à la conversation avec succès" });
+    } catch (error) {
+      console.error(`[addParticipantToConversation] Erreur lors de l'ajout du participant ${participantId} à la conversation ${conversationId}:`, error);
+      res.status(500).json({ message: "Erreur lors de l'ajout du participant à la conversation", error });
+    }
+  }
+
+  async removeParticipantFromConversation(req: Request, res: Response) {
+    const { conversationId, participantId } = req.body;
+    
+    try {
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation non trouvée" });
+      }
+      
+      if (!conversation.participants.includes(participantId)) {
+        return res.status(400).json({ message: "Le participant n'est pas dans la conversation" });
+      }
+
+      conversation.participants = conversation.participants.filter((id) => id.toString() !== participantId);
+      await conversation.save();  
+      res.status(200).json({ message: "Participant retiré de la conversation avec succès" });
+    } catch (error) {
+      console.error(`[removeParticipantFromConversation] Erreur lors du retrait du participant ${participantId} de la conversation ${conversationId}:`, error);
+      res.status(500).json({ message: "Erreur lors du retrait du participant de la conversation", error });
+    }
+  }
+
   // Obtenir toutes les conversations d'un utilisateur
   async getUserConversations(req: Request, res: Response) {
     const userId = req.params.userId;
-    console.log(`[getUserConversations] Récupération des conversations pour l'utilisateur: ${userId}`);
     
     try {
       if (!Types.ObjectId.isValid(userId)) {
-        console.log(`[getUserConversations] ID utilisateur invalide: ${userId}`);
         return res.status(400).json({ message: "ID utilisateur invalide" });
       }
 
       const userObjectId = Types.ObjectId.createFromHexString(userId);
-      console.log(`[getUserConversations] Recherche des conversations pour l'utilisateur ${userId}...`);
       
       const conversations = await Conversation.find({
         participants: userObjectId
@@ -89,19 +120,6 @@ class ConversationController {
       .populate('participants', 'username email')
       .populate('lastMessage')
       .sort({ updatedAt: -1 });
-
-      console.log(`[getUserConversations] ${conversations.length} conversations trouvées pour l'utilisateur ${userId}`);
-      
-      // Log détaillé des conversations trouvées
-      conversations.forEach((conv, index) => {
-        console.log(`[getUserConversations] Conversation ${index + 1}:`);
-        console.log(`  - ID: ${conv._id}`);
-        console.log(`  - Type: ${conv.isGroup ? 'Groupe' : 'Privée'}`);
-        console.log(`  - Nom: ${conv.isGroup ? conv.groupName : 'Conversation privée'}`);
-        console.log(`  - Participants: ${conv.participants.length}`);
-        console.log(`  - Dernière activité: ${conv.lastActivity}`);
-        console.log(`  - Dernier message: ${conv.lastMessage ? 'Oui' : 'Non'}`);
-      });
 
       res.status(200).json({ conversations });
     } catch (error) {
@@ -113,11 +131,9 @@ class ConversationController {
   // Obtenir une conversation spécifique avec ses messages
   async getConversation(req: Request, res: Response) {
     const conversationId = req.params.conversationId;
-    console.log(`[getConversation] Récupération de la conversation: ${conversationId}`);
     
     try {
       if (!Types.ObjectId.isValid(conversationId)) {
-        console.log(`[getConversation] ID conversation invalide: ${conversationId}`);
         return res.status(400).json({ message: "ID conversation invalide" });
       }
 
@@ -126,21 +142,12 @@ class ConversationController {
         .populate('lastMessage');
 
       if (!conversation) {
-        console.log(`[getConversation] Conversation non trouvée: ${conversationId}`);
         return res.status(404).json({ message: "Conversation non trouvée" });
       }
-
-      console.log(`[getConversation] Conversation trouvée: ${conversationId}`);
-      console.log(`  - Type: ${conversation.isGroup ? 'Groupe' : 'Privée'}`);
-      console.log(`  - Nom: ${conversation.isGroup ? conversation.groupName : 'Conversation privée'}`);
-      console.log(`  - Participants: ${conversation.participants.length}`);
-      console.log(`  - Dernière activité: ${conversation.lastActivity}`);
 
       const messages = await Message.find({ conversation: conversationId })
         .populate('sender', 'username email')
         .sort({ timestamp: 1 });
-
-      console.log(`[getConversation] ${messages.length} messages trouvés pour la conversation ${conversationId}`);
 
       res.status(200).json({ conversation, messages });
     } catch (error) {
@@ -152,17 +159,14 @@ class ConversationController {
   async getMessageReadStats(req: Request, res: Response) {
     const conversationId = req.params.conversationId;
     const userId = (req as any).user.id;
-    console.log(`[getMessageReadStats] Récupération des stats de lecture pour la conversation: ${conversationId} par l'utilisateur: ${userId}`);
     
     try {
       // Validation des IDs
       if (!mongoose.isValidObjectId(conversationId)) {
-        console.log(`[getMessageReadStats] ID de conversation invalide: ${conversationId}`);
         return res.status(400).json({ message: "ID de conversation invalide" });
       }
 
       if (!mongoose.isValidObjectId(userId)) {
-        console.log(`[getMessageReadStats] ID d'utilisateur invalide: ${userId}`);
         return res.status(400).json({ message: "ID d'utilisateur invalide" });
       }
 
@@ -171,7 +175,6 @@ class ConversationController {
         .select('participants isGroup groupName'); // Sélectionner uniquement les champs nécessaires
 
       if (!conversation) {
-        console.log(`[getMessageReadStats] Conversation non trouvée: ${conversationId}`);
         return res.status(404).json({ message: "Conversation non trouvée" });
       }
 
@@ -180,7 +183,6 @@ class ConversationController {
         (participant) => participant.toString() === userId
       );
       if (!isParticipant) {
-        console.log(`[getMessageReadStats] Accès refusé - L'utilisateur ${userId} n'est pas participant de la conversation ${conversationId}`);
         return res.status(403).json({ message: "Vous n'êtes pas participant de cette conversation" });
       }
 
@@ -191,8 +193,6 @@ class ConversationController {
         'readBy.user': { $ne: userId }
       });
 
-      console.log(`[getMessageReadStats] ${unreadMessagesCount} messages non lus trouvés pour la conversation ${conversationId}`);
-
       res.status(200).json({
         unreadCount: unreadMessagesCount,
         conversationId: conversationId,
@@ -201,8 +201,7 @@ class ConversationController {
         lastUpdate: new Date()
       });
 
-    } catch (error) {
-      console.error(`[getMessageReadStats] Erreur lors de la récupération des stats pour ${conversationId}:`, error);
+    } catch (error) { 
       res.status(500).json({
         message: "Erreur lors de la récupération des statistiques de lecture",
         error: error instanceof Error ? error.message : "Erreur inconnue"

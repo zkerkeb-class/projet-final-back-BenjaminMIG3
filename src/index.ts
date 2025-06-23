@@ -7,7 +7,7 @@ import userRoutes from './routes/userRoutes';
 import messageRouter from './routes/messageRoutes';
 import conversationRouter from './routes/conversationRoutes';
 import friendshipRouter from './routes/friendshipRoutes';
-import { Server } from 'socket.io';
+import socketServer from './config/sockets';
 
 require('dotenv').config();
 
@@ -15,33 +15,7 @@ const app = express();
 const httpServer = createServer(app);
 const port = process.env.PORT;
 
-const io = new Server(httpServer, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
-});
-
-if(io) {
-  console.log('Socket.IO server is running');
-}
-
-io.on('connection', (socket) => {
-  console.log('Un client est connecté :', socket.id);
-
-  // Écouter un événement personnalisé envoyé par le client
-  socket.on('message', (data) => {
-    console.log('Message reçu :', data);
-
-    // Diffuser le message à tous les clients connectés
-    io.emit('message', data);
-  });
-
-  // Gérer la déconnexion
-  socket.on('disconnect', () => {
-    console.log('Client déconnecté :', socket.id);
-  });
-});
+socketServer.attach(httpServer);
 
 connectDB();
 
@@ -56,4 +30,5 @@ app.use('/api/friendships', friendshipRouter);
 // Utilisation de httpServer au lieu de app.listen
 httpServer.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
+  console.log(`WebSocket server ready for connections`);
 });

@@ -52,6 +52,72 @@ class UserController {
     res.status(200).json({ message: 'Logged out successfully' });
   }
 
+  async verify(req: Request, res: Response) {
+    try {
+      let decoded: any;
+      
+      // Si le middleware a déjà vérifié le token, l'utiliser
+      if ((req as any).user) {
+        decoded = (req as any).user;
+      } else {
+        return res.status(401).json({ message: 'No token provided' });
+      }
+
+      res.status(200).json({ message: 'Token verified successfully' });
+    } catch (error) {
+      if (error instanceof jwt.JsonWebTokenError) {
+        return res.status(403).json({ message: 'Invalid token' });
+      } else if (error instanceof jwt.TokenExpiredError) {
+        return res.status(401).json({ message: 'Token expired' });
+      }
+      res.status(500).json({ message: 'Error verifying token', error });
+    }
+  }
+
+  // Récupère le profil de l'utilisateur à partir du token JWT
+  async getProfile(req: Request, res: Response) {
+    try {
+      let decoded: any;
+      
+      // Si le middleware a déjà vérifié le token, l'utiliser
+      if ((req as any).user) {
+        decoded = (req as any).user;
+      } else {
+        // Sinon, récupérer et vérifier le token depuis le header Authorization
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer <token>"
+        
+        if (!token) {
+          return res.status(401).json({ message: 'No token provided' });
+        }
+
+        // Vérifier et décoder le token
+        decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret') as any;
+      }
+      
+      // Récupérer l'utilisateur depuis la base de données
+      const user = await User.findById(decoded.id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.status(200).json({ 
+        user: { 
+          id: user._id, 
+          username: user.username, 
+          email: user.email
+        }
+      });
+    } catch (error) {
+      if (error instanceof jwt.JsonWebTokenError) {
+        return res.status(403).json({ message: 'Invalid token' });
+      } else if (error instanceof jwt.TokenExpiredError) {
+        return res.status(401).json({ message: 'Token expired' });
+      }
+      res.status(500).json({ message: 'Error retrieving profile', error });
+    }
+  }
+
   async deleteUser(req: Request, res: Response) {
     const { error } = deleteUserSchema.validate(req.params);
     if (error) {

@@ -13,4 +13,6 @@ userRoutes.delete('/delete/:userId', userController.deleteUser);
 userRoutes.get('/getUser/:userId', userController.getUser);
 userRoutes.get('/getUserByEmail/:email', userController.getUserByEmail);
 userRoutes.get('/getUserByUsername/:username', authenticateToken, userController.getUserByUsername);
+userRoutes.get('/verify', authenticateToken, userController.verify);
+userRoutes.get('/profile', authenticateToken, userController.getProfile);
 export default userRoutes;
