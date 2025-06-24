@@ -10,9 +10,14 @@ class ConversationController {
     const { participants, createdBy, isGroup, groupName } = req.body; // Extraire tous les champs nécessaires
     
     try {
-      // Vérifier si une conversation existe déjà entre ces participants
+      // Vérifier si une conversation existe déjà entre ces participants EXACTEMENT
+      // $all vérifie que tous les participants sont présents
+      // $size vérifie que le nombre de participants correspond exactement
       const existingConversation = await Conversation.findOne({
-        participants: { $all: participants }
+        participants: { 
+          $all: participants.map((id: string) => Types.ObjectId.createFromHexString(id)),
+          $size: participants.length 
+        }
       });
   
       if (existingConversation) {
